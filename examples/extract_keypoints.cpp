@@ -1,4 +1,5 @@
 #include "mpiSfM/SIFT++.hpp"
+#include "mpiSfM/DataUtility.hpp"
 #include <string>
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
@@ -9,8 +10,6 @@
 using namespace std;
 namespace mpi = boost::mpi;
 
-void load_images(string image_filepath, vector<string>& image_filenames);
-
 int main(int argc, char** argv)
 {
 	mpi::environment env;
@@ -18,10 +17,16 @@ int main(int argc, char** argv)
 
 	if (world.rank() == 0) {
 
-		string image_filepath = "data/sample_images/";
-		string key_filepath = "data/generated_keys/";
+		cv::FileStorage fs;
+		fs.open("data/match_keypoints_info.yml", cv::FileStorage::READ);
+		string image_filepath = fs["general_settings"]["image_folder"];
+		string key_filepath = fs["general_settings"]["keys_folder"];
+		fs.release();
+
+		boost::filesystem::create_directories(key_filepath.c_str());
+
 		vector<string> image_filenames;
-		load_images(image_filepath, image_filenames);
+		LoadImages(image_filepath, image_filenames);
 
 		int size = world.size();
 
@@ -50,31 +55,6 @@ int main(int argc, char** argv)
 		cout << "Rank: " << world.rank() << endl;
 
 		for (int pc = 0; pc < image_filenames.size(); pc++)
-			// generate_keypoints(image_filenames[pc], image_filenames[pc].substr(0, image_filenames[pc].size() - 4) + ".key");
 			generate_keypoints(image_filepath + image_filenames[pc], key_filepath + image_filenames[pc].substr(0, image_filenames[pc].size() - 4) + ".key");
-	}
-}
-
-
-/* Loads image names as strings from a directory*/
-void load_images(string image_filepath, vector<string>& image_filenames)
-{
-	boost::filesystem::path p(image_filepath.c_str());
-
-	try
-	{
-		if (exists(p)) {
-			if (is_directory(p)) {
-				cout << p << " Directory Containing Images Found:\n";
-				for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(p))
-					image_filenames.push_back(x.path().filename().string());
-			}else
-				cout << p << " exists, but is not a directory\n";
-		}else
-			cout << p << " does not exist\n";
-	}
-	catch (const boost::filesystem::filesystem_error& ex)
-	{
-		cout << ex.what() << '\n';
 	}
 }
