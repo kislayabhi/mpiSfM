@@ -1,0 +1,9 @@
+ImageWidth: 1280                                                                                                                                                                                                         
+ImageHeight: 960
+FocalLengthX: 568.996140852
+FocalLengthY: 568.988362396
+PrincipalPointX: 643.21055941
+PrincipalPointY: 477.982801038
+DistW: 0.001553
+CenterOfDistortionX: 643.696778
+CenterOfDistortionY: 472.103088

@@ -1,0 +1,20 @@
+%YAML 1.0
+---
+general_settings:
+        image_folder: "data/sample_images/"
+        keys_folder: "data/generated_keys/"
+
+match_keypoints_demo_settings:
+        reconstruction_folder: "data/reconstruction/"
+        measurement_folder: "data/reconstruction/measurement/"
+
+calibration_settings:
+        ImageWidth: 1280
+        ImageHeight: 960
+        FocalLengthX: 568.996140852
+        FocalLengthY: 568.988362396
+        PrincipalPointX: 643.21055941
+        PrincipalPointY: 477.982801038
+        DistW: 0.001553
+        CenterOfDistortionX: 643.696778
+        CenterOfDistortionY: 472.103088
