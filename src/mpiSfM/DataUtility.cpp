@@ -3295,8 +3295,8 @@ void SaveMeasurementData_RGB_DESC(string filename, vector<Feature> vFeature, int
 	else
 		file.open(filename.c_str(), ios_base::out);
 	for (int iFeature = 0; iFeature < vFeature.size(); iFeature++) {
-		file << vFeature[iFeature].vFrame.size() << " " << vFeature[iFeature].id << " ";
-		file << vFeature[iFeature].r << " " << vFeature[iFeature].g << " " << vFeature[iFeature].b << " ";
+		file << vFeature[iFeature].vFrame.size() << " s " << vFeature[iFeature].id << " id ";
+		file << vFeature[iFeature].r << " r " << vFeature[iFeature].g << " g " << vFeature[iFeature].b << " b ";
 		for (int i = 0; i < vFeature[iFeature].vFrame.size(); i++) {
 			file << vFeature[iFeature].vCamera[i] << " " << vFeature[iFeature].vFrame[i] << " " << vFeature[iFeature].vx[i] << " " << vFeature[iFeature].vy[i] << " ";
 			file << vFeature[iFeature].vx_dis[i] << " " << vFeature[iFeature].vy_dis[i] << " ";

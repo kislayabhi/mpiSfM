@@ -8,6 +8,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+#include <boost/mpi/environment.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/mpi/collectives.hpp>
+
 using namespace std;
 
 struct SIFT_Descriptor {
@@ -19,6 +27,19 @@ struct SIFT_Descriptor {
 	vector<int> vDesc_int;
 	double direction;
 	double scale;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version)
+	{
+		ar & id;
+		ar & r; ar & g; ar & b;
+		ar & x; ar & y;
+		ar & dis_x; ar & dis_y;
+		ar & vDesc; ar& vDesc_int;
+		ar & direction;
+		ar & scale;
+	}
+
 };
 
 struct Correspondence2D3D {
@@ -157,6 +178,16 @@ struct FrameCamera {
 	vector<CvMat *> vInvK;
 	vector<double> vk1;
 	vector<double> vk2;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version)
+	{
+		ar & frameIdx;
+		ar & cameraID;
+		ar & takenFrame;
+		ar & imageFileName;
+		ar & vSift_desc;
+	}
 };
 
 struct DynamicObjectWindow {

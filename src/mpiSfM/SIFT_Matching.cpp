@@ -1,5 +1,6 @@
 #include "mpiSfM/SIFT_Matching.hpp"
 
+
 using namespace std;
 
 void Undistortion(double omega, double DistCtrX, double DistCtrY, vector<double> &vx,  vector<double> &vy)
@@ -19,7 +20,8 @@ void Undistortion(double omega, double DistCtrX, double DistCtrY, vector<double>
 void Iterate_SIFT_STATIC_MP(vector<FrameCamera> &vFC, int currentFC, CvMat *K, CvMat *invK, double omega, vector<Feature> &feature_static, bool display)
 {
 	FrameCamera cFC = vFC[currentFC];
-	IplImage *iplImg1 = cvLoadImage(cFC.imageFileName.c_str());
+
+	// IplImage *iplImg1 = cvLoadImage(cFC.imageFileName.c_str());
 
 	flann::Matrix<float> descM1(new float[cFC.vSift_desc.size() * 128], cFC.vSift_desc.size(), 128);
 
@@ -37,15 +39,15 @@ void Iterate_SIFT_STATIC_MP(vector<FrameCamera> &vFC, int currentFC, CvMat *K, C
 		fs.vy_dis.push_back(cFC.vSift_desc[iFeature].dis_y);
 		fs.vvDesc.push_back(cFC.vSift_desc[iFeature].vDesc);
 		CvScalar s;
-		s = cvGet2D(iplImg1, ((int)cFC.vSift_desc[iFeature].dis_y), ((int)cFC.vSift_desc[iFeature].dis_x));
-		fs.b = s.val[0];
-		fs.g = s.val[1];
-		fs.r = s.val[2];
+		// s = cvGet2D(iplImg1, ((int)cFC.vSift_desc[iFeature].dis_y), ((int)cFC.vSift_desc[iFeature].dis_x));
+		// fs.b = s.val[0];
+		// fs.g = s.val[1];
+		// fs.r = s.val[2];
 		feature_static.push_back(fs);
 	}
-	cvReleaseImage(&iplImg1);
+	// cvReleaseImage(&iplImg1);
 
-	flann::Index<flann::L2<float> > index1(descM1, flann::KDTreeIndexParams(4));
+	flann::Index<flann::L2< float> > index1(descM1, flann::KDTreeIndexParams(4));
 	index1.buildIndex();
 
 	vector<Point> featureSequence;

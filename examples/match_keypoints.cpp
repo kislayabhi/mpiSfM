@@ -1,161 +1,186 @@
+#include <string>
+#include <boost/mpi/environment.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/mpi/collectives.hpp>
+
 #include "mpiSfM/SIFT_Matching.hpp"
 
 using namespace std;
+namespace mpi = boost::mpi;
 
 int main( int argc, char * argv[] )
 {
-	string path = FILE_PATH;
+	mpi::environment env;
+	mpi::communicator world;
 
-	cv::FileStorage fs;
-
-	fs.open("data/match_keypoints_info.yml", cv::FileStorage::READ);
-
-	string savepath = (string)fs["match_keypoints_demo_settings"]["reconstruction_folder"];
-	string savepath_m = (string)fs["match_keypoints_demo_settings"]["measurement_folder"];
-	string keylist = (string)fs["general_settings"]["keys_folder"];
-	string imagelist = (string)fs["general_settings"]["image_folder"];
-
-	vector<int> vAddedCameraID;
-	FileName fn;
-
-	string savefile_static = savepath_m + "static_measurement_desc%07d.txt";
-
+	vector<vector<int> > currentCoreFrameOrder;
+	vector<FrameCamera> vFC;
+	CvMat *K = cvCreateMat(3, 3, CV_32FC1);
+	CvMat *invK = cvCreateMat(3, 3, CV_32FC1);
+	double focal_x = 0;
+	double focal_y = 0;
+	double princ_x = 0;
+	double princ_y = 0;
+	double omega = 0;
 	int display = 0;
 
-	vector<Camera> vCamera;
-	vector<int> vFirstFrame, vStrideFrame;
-	vector<string> vDynamicObjectWindowFile, vPath;
+	string savefile_static;
+	if (world.rank() == 0) {
 
-	boost::filesystem::create_directories(savepath.c_str());
-	boost::filesystem::create_directories(savepath_m.c_str());
+		string path = FILE_PATH;
 
-	vector<string> vImagename;
-	vector<string> vKeysname;
-	LoadKeys(keylist, vKeysname);
-	LoadImages(imagelist, vImagename);
+		cv::FileStorage fs;
 
-	for (int ikj = 0; ikj < vImagename.size(); ikj++)
-		cout << vImagename[ikj] << ", " << vKeysname[ikj] << endl;
+		fs.open("data/match_keypoints_info.yml", cv::FileStorage::READ);
 
-        Camera cam;
-        cam.id = 0;
-        for (int iFile = 0; iFile < vImagename.size(); iFile++) {
-                cam.vImageFileName.push_back(path + imagelist + vImagename[iFile]);
-                cam.vKeyFileName.push_back(path + keylist + vKeysname[iFile]);
-                cam.vTakenFrame.push_back(iFile);
-                cout << *(cam.vImageFileName.end() - 1) << endl;
-        }
-        vCamera.push_back(cam);
+		string savepath = (string)fs["match_keypoints_demo_settings"]["reconstruction_folder"];
+		string savepath_m = (string)fs["match_keypoints_demo_settings"]["measurement_folder"];
+		string keylist = (string)fs["general_settings"]["keys_folder"];
+		string imagelist = (string)fs["general_settings"]["image_folder"];
+		savefile_static = savepath_m + "static_measurement_desc%07d.txt";
 
-        int im_width = (int)fs["calibration_settings"]["ImageWidth"];
-        int im_height = (int)fs["calibration_settings"]["ImageHeight"];
-        double focal_x = (double)fs["calibration_settings"]["FocalLengthX"];
-        double focal_y = (double)fs["calibration_settings"]["FocalLengthY"];
-        double princ_x = (double)fs["calibration_settings"]["PrincipalPointX"];
-        double princ_y = (double)fs["calibration_settings"]["PrincipalPointY"];
-        double omega = (double)fs["calibration_settings"]["DistW"];
-        double distCtrX = (double)fs["calibration_settings"]["CenterOfDistortionX"];
-        double distCtrY = (double)fs["calibration_settings"]["CenterOfDistortionY"];
+		vector<int> vAddedCameraID;
+		FileName fn;
 
-        fs.release();
+		vector<Camera> vCamera;
+		vector<int> vFirstFrame, vStrideFrame;
+		vector<string> vDynamicObjectWindowFile, vPath;
 
-        CvMat *K = cvCreateMat(3, 3, CV_32FC1);
-        cvSetIdentity(K);
-        cvSetReal2D(K, 0, 0, focal_x);
-        cvSetReal2D(K, 0, 2, princ_x);
-        cvSetReal2D(K, 1, 1, focal_y);
-        cvSetReal2D(K, 1, 2, princ_y);
-        CvMat *invK = cvCreateMat(3, 3, CV_32FC1);
-        cvInvert(K, invK);
-        // fin_cal.close();
+		boost::filesystem::create_directories(savepath.c_str());
+		boost::filesystem::create_directories(savepath_m.c_str());
 
-        vector<int> vFrameOrder;
-        if (vCamera[0].vTakenFrame.size() % 2 == 0) {
-                for (int i = 0; i < vCamera[0].vTakenFrame.size() / 2; i++) {
-                        vFrameOrder.push_back(i);
-                        vFrameOrder.push_back(vCamera[0].vTakenFrame.size() - i - 1);
-                }
-        }else {
-                for (int i = 0; i < (vCamera[0].vTakenFrame.size() - 1) / 2; i++) {
-                        vFrameOrder.push_back(i);
-                        vFrameOrder.push_back(vCamera[0].vTakenFrame.size() - i - 1);
-                }
-                vFrameOrder.push_back((vCamera[0].vTakenFrame.size() - 1) / 2);
-        }
+		vector<string> vImagename;
+		vector<string> vKeysname;
+		LoadKeys(keylist, vKeysname);
+		LoadImages(imagelist, vImagename);
 
-        if (display)
-                cvNamedWindow("SIFT_LOWES", CV_WINDOW_AUTOSIZE);
-        vector<int> vTotalTakenFrame;
-        vector<int> vCameraID;
-        vector<string> vImageFileName;
-        vector<FrameCamera> vFC;
+		for (int ikj = 0; ikj < vImagename.size(); ikj++)
+			cout << vImagename[ikj] << ", " << vKeysname[ikj] << endl;
 
-        vector<vector<SIFT_Descriptor> > vvSift_desc;
-        vFC.resize(vCamera[0].vTakenFrame.size());
+		Camera cam;
+		cam.id = 0;
+		for (int iFile = 0; iFile < vImagename.size(); iFile++) {
+			cam.vImageFileName.push_back(path + imagelist + vImagename[iFile]);
+			cam.vKeyFileName.push_back(path + keylist + vKeysname[iFile]);
+			cam.vTakenFrame.push_back(iFile);
+			cout << *(cam.vImageFileName.end() - 1) << endl;
+		}
+		vCamera.push_back(cam);
 
-        for (int iFrame = 0; iFrame < vCamera[0].vTakenFrame.size(); iFrame++) {
-                FrameCamera fc;
-                string keyFile = vCamera[0].vKeyFileName[iFrame];
-                fc.imageFileName = vCamera[0].vImageFileName[iFrame];
+		int im_width = (int)fs["calibration_settings"]["ImageWidth"];
+		int im_height = (int)fs["calibration_settings"]["ImageHeight"];
+		focal_x = (double)fs["calibration_settings"]["FocalLengthX"];
+		focal_y = (double)fs["calibration_settings"]["FocalLengthY"];
+		princ_x = (double)fs["calibration_settings"]["PrincipalPointX"];
+		princ_y = (double)fs["calibration_settings"]["PrincipalPointY"];
+		omega = (double)fs["calibration_settings"]["DistW"];
+		double distCtrX = (double)fs["calibration_settings"]["CenterOfDistortionX"];
+		double distCtrY = (double)fs["calibration_settings"]["CenterOfDistortionY"];
 
-                fc.cameraID = 0;
-                fc.frameIdx = iFrame;
+		fs.release();
 
-                vector<SIFT_Descriptor> vSift_desc;
-                LoadSIFTData_int(keyFile, vSift_desc);
+		currentCoreFrameOrder.resize(world.size());
+		int j_max = currentCoreFrameOrder.size() - 1;
+		int j = 0;
+		bool alt = false;
+		for (int i = 0; i < vCamera[0].vTakenFrame.size(); i++) {
+			currentCoreFrameOrder[j].push_back(i);
+			if (alt == false) {
+				if (j == j_max) alt = !alt;
+				else j++;
+			}else {
+				if (j == 0) alt = !alt;
+				else j--;
+			}
+		}
 
-                vector<double> vx1, vy1;
-                vector<double> dis_vx1, dis_vy1;
+		if (display)
+			cvNamedWindow("SIFT_LOWES", CV_WINDOW_AUTOSIZE);
+		vector<int> vTotalTakenFrame;
+		vector<int> vCameraID;
+		vector<string> vImageFileName;
 
-                for (int isift = 0; isift < vSift_desc.size(); isift++) {
-                        vx1.push_back(vSift_desc[isift].x);
-                        vy1.push_back(vSift_desc[isift].y);
-                }
-                Undistortion(omega, distCtrX, distCtrY, vx1, vy1);
-                for (int isift = 0; isift < vSift_desc.size(); isift++) {
-                        vSift_desc[isift].x = vx1[isift];
-                        vSift_desc[isift].y = vy1[isift];
-                }
+		vFC.resize(vCamera[0].vTakenFrame.size());
 
-                fc.vSift_desc = vSift_desc;
-                vSift_desc.clear();
-                vFC[iFrame] = fc;
-        }
+		for (int iFrame = 0; iFrame < vCamera[0].vTakenFrame.size(); iFrame++) {
+			FrameCamera fc;
+			string keyFile = vCamera[0].vKeyFileName[iFrame];
+			fc.imageFileName = vCamera[0].vImageFileName[iFrame];
 
-        int nTotal = vFrameOrder.size();
-        int current = 0;
-        vector<int> vFrameIdx;
-        vFrameIdx.resize(vFrameOrder.size(), 0);
+			fc.cameraID = 0;
+			fc.frameIdx = iFrame;
 
-        for (int iFC = 0; iFC < vFrameOrder.size(); iFC++) {
-                int iFC1 = vFrameOrder[iFC];
+			vector<SIFT_Descriptor> vSift_desc;
+			LoadSIFTData_int(keyFile, vSift_desc);
 
-                FrameCamera cFC = vFC[iFC1];
-                vector<Feature> feature_static;
+			vector<double> vx1, vy1;
+			vector<double> dis_vx1, dis_vy1;
 
-                Iterate_SIFT_STATIC_MP(vFC, iFC1, K, invK, omega, feature_static, display);
+			for (int isift = 0; isift < vSift_desc.size(); isift++) {
+				vx1.push_back(vSift_desc[isift].x);
+				vy1.push_back(vSift_desc[isift].y);
+			}
+			Undistortion(omega, distCtrX, distCtrY, vx1, vy1);
+			for (int isift = 0; isift < vSift_desc.size(); isift++) {
+				vSift_desc[isift].x = vx1[isift];
+				vSift_desc[isift].y = vy1[isift];
+			}
 
-                for (int iFeature = 0; iFeature < feature_static.size(); iFeature++)
-                        feature_static[iFeature].id = 0;
+			fc.vSift_desc = vSift_desc;
+			vSift_desc.clear();
+			vFC[iFrame] = fc;
+		}
+	}
 
-                char temp[1000];
-                sprintf(temp, savefile_static.c_str(), iFC1);
-                string savefile_static1 = temp;
-                SaveMeasurementData_RGB_DESC(savefile_static1, feature_static, FILESAVE_WRITE_MODE);
-                feature_static.clear();
 
-                vFrameIdx[iFC] = 1;
-                int count = 0;
-                for (int ic = 0; ic < vFrameIdx.size(); ic++)
-                        if (vFrameIdx[ic] == 1)
-                                count++;
-                cout << "Status: " << count << " " << nTotal << endl;
-        }
+	// A series of broadcasts will happen here and we need to take care of them.
+	broadcast(world, currentCoreFrameOrder, 0);
+	broadcast(world, vFC, 0);
+	broadcast(world, savefile_static, 0);
+	broadcast(world, omega, 0);
+	broadcast(world, focal_x, 0);
+	broadcast(world, focal_y, 0);
+	broadcast(world, princ_x, 0);
+	broadcast(world, princ_y, 0);
 
-        vvSift_desc.clear();
-        vector<int> vnFrame;
-        for (int i = 0; i < vCamera.size(); i++)
-                vnFrame.push_back(vCamera[i].nFrames);
+	cout << "Rank: " << world.rank() << " ";
+	for (auto&ee : currentCoreFrameOrder[world.rank()])
+		cout << ee << ", ";
+	cout << endl;
+
+	cvSetIdentity(K);
+	cvSetReal2D(K, 0, 0, focal_x);
+	cvSetReal2D(K, 0, 2, princ_x);
+	cvSetReal2D(K, 1, 1, focal_y);
+	cvSetReal2D(K, 1, 2, princ_y);
+	cvInvert(K, invK);
+
+	vector<int> vFrameOrder = currentCoreFrameOrder[world.rank()];
+	for (int iFC = 0; iFC < vFrameOrder.size(); iFC++) {
+		int iFC1 = vFrameOrder[iFC];
+
+		FrameCamera cFC = vFC[iFC1];
+		vector<Feature> feature_static;
+		Iterate_SIFT_STATIC_MP(vFC, iFC1, K, invK, omega, feature_static, display);
+
+		for (int iFeature = 0; iFeature < feature_static.size(); iFeature++)
+		     feature_static[iFeature].id = 0;
+
+		char temp[1000];
+		sprintf(temp, savefile_static.c_str(), iFC1);
+		string savefile_static1 = temp;
+		cout<<temp<<endl;
+		SaveMeasurementData_RGB_DESC(savefile_static1, feature_static, FILESAVE_WRITE_MODE);
+		feature_static.clear();
+	}
+
+	// vvSift_desc.clear();
+	// vector<int> vnFrame;
+	// for (int i = 0; i < vCamera.size(); i++)
+	//      vnFrame.push_back(vCamera[i].nFrames);
 
 	return 0;
 }
