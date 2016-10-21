@@ -9,6 +9,7 @@ This is a currently ongoing implementation of Structure From Motion pipeline on 
 ##Running Examples:
 
 Since I have added some images alongside (which I know is not a good thing), you can get started building and running the code in following steps.
+
 1. $ mkdir build
 2. $ cd build
 3. $ cmake ..
